@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "react-native-simple-note-pitch-detector": ["../src/index"],
+      "react-native-simple-note-pitch-detector/*": ["../src/*"]
+    }
+  }
+}
