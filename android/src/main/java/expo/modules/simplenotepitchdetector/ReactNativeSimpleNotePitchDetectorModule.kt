@@ -1,8 +1,5 @@
 package expo.modules.simplenotepitchdetector
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.simplepitchdetector.PitchAnalyzer
@@ -25,21 +22,6 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
       }
 
       pitchAnalyzer.start()
-
-//      val context = appContext.reactContext!!
-//      var activity = appContext.currentActivity!!
-//      var permissionsGranted = ActivityCompat.checkSelfPermission(context, permissions[0]) == PackageManager.PERMISSION_GRANTED
-//      if (!permissionsGranted) {
-//        ActivityCompat.requestPermissions(activity, permissions, 200)
-//      } else {
-//        val pitchAnalyzer = PitchAnalyzer {
-//          this@ReactNativeSimpleNotePitchDetectorModule.sendEvent(
-//            "onChange",
-//            bundleOf("tone" to it)
-//          )
-//        }
-//        pitchAnalyzer.start()
-//      }
     }
   }
 }

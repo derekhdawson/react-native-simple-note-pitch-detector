@@ -1,7 +1,7 @@
 {
   "name": "react-native-simple-note-pitch-detector",
-  "version": "0.1.7",
-  "description": "asdf",
+  "version": "0.1.8",
+  "description": "a simple react native library to detect the pitch of the input recording",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {

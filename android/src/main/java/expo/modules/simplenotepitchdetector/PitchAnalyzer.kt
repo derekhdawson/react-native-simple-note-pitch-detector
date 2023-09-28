@@ -14,18 +14,17 @@ import kotlin.math.round
 
 class PitchAnalyzer {
 
-    var onChangePitch: (String, Double) -> Unit
+    private val tones = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
+
+    private var onChangePitch: (String, Double) -> Unit
+
+    private var dispatcher: AudioDispatcher? = null
+    private var processor: AudioProcessor? = null
+    private var runner: Thread? = null
 
     constructor(callback: (String, Double) -> Unit) {
         this.onChangePitch = callback
     }
-
-    private val tones = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
-
-    private var dispatcher: AudioDispatcher? = null
-    private var processor: AudioProcessor? = null
-
-    private var runner: Thread? = null
 
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
