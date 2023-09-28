@@ -1,6 +1,6 @@
 {
   "name": "react-native-simple-note-pitch-detector",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "asdf",
   "main": "build/index.js",
   "types": "build/index.d.ts",
