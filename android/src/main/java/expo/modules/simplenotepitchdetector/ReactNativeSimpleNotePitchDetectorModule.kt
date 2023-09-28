@@ -7,21 +7,31 @@ import androidx.core.os.bundleOf
 
 class ReactNativeSimpleNotePitchDetectorModule : Module() {
 
+  private val pitchAnalyzer = PitchAnalyzer()
+
   override fun definition() = ModuleDefinition {
+
     Name("ReactNativeSimpleNotePitchDetector")
 
     Events("onChangePitch")
 
-    Function("start") {
+    Function("isRecording") {
+      pitchAnalyzer.isRecording()
+    }
 
-      val pitchAnalyzer = PitchAnalyzer { tone: String, frequency: Double ->
+    Function("start") {
+      pitchAnalyzer.addOnChangePitchListener { note: String, frequency: Double ->
         this@ReactNativeSimpleNotePitchDetectorModule.sendEvent(
           "onChangePitch",
-          bundleOf("tone" to tone, "frequency" to frequency)
+          bundleOf("note" to note, "frequency" to frequency)
         )
       }
 
       pitchAnalyzer.start()
+    }
+
+    Function("stop") {
+        pitchAnalyzer.stop()
     }
   }
 }

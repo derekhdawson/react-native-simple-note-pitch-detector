@@ -15,6 +15,14 @@ export function start() {
   return ReactNativeSimpleNotePitchDetectorModule.start();
 }
 
+export function stop() {
+  return ReactNativeSimpleNotePitchDetectorModule.stop();
+}
+
+export function isRecording() {
+  return ReactNativeSimpleNotePitchDetectorModule.isRecording();
+}
+
 const emitter = new EventEmitter(
   ReactNativeSimpleNotePitchDetectorModule ??
     NativeModulesProxy.ReactNativeSimpleNotePitchDetector

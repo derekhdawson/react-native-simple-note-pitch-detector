@@ -6,25 +6,21 @@ import be.tarsos.dsp.io.android.AudioDispatcherFactory
 import be.tarsos.dsp.pitch.PitchDetectionHandler
 import be.tarsos.dsp.pitch.PitchProcessor
 import be.tarsos.dsp.pitch.PitchProcessor.PitchEstimationAlgorithm
-import com.facebook.react.bridge.WritableMap
-import com.facebook.react.bridge.WritableNativeMap
+import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.round
 
 
 class PitchAnalyzer {
 
-    private val tones = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
+    private val notes = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
 
-    private var onChangePitch: (String, Double) -> Unit
+    private lateinit var onChangePitch: (String, Double) -> Unit
+    private var isRecording = false
 
     private var dispatcher: AudioDispatcher? = null
     private var processor: AudioProcessor? = null
     private var runner: Thread? = null
-
-    constructor(callback: (String, Double) -> Unit) {
-        this.onChangePitch = callback
-    }
 
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
@@ -39,23 +35,34 @@ class PitchAnalyzer {
     }
 
     private fun process(pitchInHz: Float) {
-        val index = round(12 * (log2(pitchInHz / 440) / log2(2f)) + 69) % 12
+        val freq = round(12 * (log2(pitchInHz / 440) / log2(2f)) + 69)
+        val octave = (floor(freq / 12) - 1).toInt()
+        val index = freq % 12
 
         if (!index.isNaN() && pitchInHz > 0) {
-            val tone = tones[index.toInt()]
-            val frequency = pitchInHz.toDouble()
+            val note = notes[index.toInt()]
 
-            this.onChangePitch(tone, frequency)
+            this.onChangePitch("$note$octave", pitchInHz.toDouble())
         }
+    }
+
+    fun addOnChangePitchListener(onChangePitch: (String, Double) -> Unit) {
+        this.onChangePitch = onChangePitch
     }
 
     fun start() {
         prepare()
         runner = Thread(dispatcher)
         runner?.start()
+        isRecording = true
     }
     fun stop() {
         dispatcher?.stop()
         runner?.interrupt()
+        isRecording = false
+    }
+
+    fun isRecording(): Boolean {
+        return isRecording
     }
 }
