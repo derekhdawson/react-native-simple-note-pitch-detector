@@ -1,6 +1,6 @@
 export type ChangeEventPayload = {
   note: string;
-  frequency: number;
+  soundPressure: number;
 };
 
 export type ReactNativeSimpleNotePitchDetectorViewProps = {

@@ -24,7 +24,9 @@ class PitchAnalyzer {
 
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
-        process(pitchInHz)
+        val soundPressure = e.getdBSPL()
+
+        process(pitchInHz, soundPressure)
     }
 
     private fun prepare() {
@@ -34,7 +36,7 @@ class PitchAnalyzer {
         dispatcher?.addAudioProcessor(processor)
     }
 
-    private fun process(pitchInHz: Float) {
+    private fun process(pitchInHz: Float, soundPressure: Double) {
         val freq = round(12 * (log2(pitchInHz / 440) / log2(2f)) + 69)
         val octave = (floor(freq / 12) - 1).toInt()
         val index = freq % 12
@@ -42,7 +44,7 @@ class PitchAnalyzer {
         if (!index.isNaN() && pitchInHz > 0) {
             val note = notes[index.toInt()]
 
-            this.onChangePitch("$note$octave", pitchInHz.toDouble())
+            this.onChangePitch("$note$octave", soundPressure)
         }
     }
 

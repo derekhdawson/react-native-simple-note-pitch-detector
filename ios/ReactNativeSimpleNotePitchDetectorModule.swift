@@ -46,7 +46,7 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
             return
         }
 
-        self.sendEvent("onChangePitch", ["note" :  pitch.note.string, "frequency" : pitch.frequency])
+        self.sendEvent("onChangePitch", ["note" :  pitch.note.string, "soundPressure" : pitchEngine.signalLevel])
     }
 
     public func pitchEngine(_ pitchEngine: PitchEngine, didReceiveError error: Error) {
