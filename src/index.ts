@@ -5,7 +5,6 @@ import {
 } from "expo-modules-core";
 
 import ReactNativeSimpleNotePitchDetectorModule from "./ReactNativeSimpleNotePitchDetectorModule";
-import ReactNativeSimpleNotePitchDetectorView from "./ReactNativeSimpleNotePitchDetectorView";
 import {
   ChangeEventPayload,
   ReactNativeSimpleNotePitchDetectorViewProps,
@@ -34,8 +33,4 @@ export function onChangePitch(
   return emitter.addListener<ChangeEventPayload>("onChangePitch", listener);
 }
 
-export {
-  ReactNativeSimpleNotePitchDetectorView,
-  ReactNativeSimpleNotePitchDetectorViewProps,
-  ChangeEventPayload,
-};
+export { ReactNativeSimpleNotePitchDetectorViewProps, ChangeEventPayload };
