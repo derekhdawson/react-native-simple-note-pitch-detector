@@ -20,10 +20,10 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
     }
 
     Function("start") {
-      pitchAnalyzer.addOnChangePitchListener { note: String, soundPressure: Double ->
+      pitchAnalyzer.addOnChangePitchListener { note: String->
         this@ReactNativeSimpleNotePitchDetectorModule.sendEvent(
           "onChangePitch",
-          bundleOf("note" to note, "soundPressure" to soundPressure)
+          bundleOf("note" to note, "soundPressure" to "")
         )
       }
 

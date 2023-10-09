@@ -10,12 +10,18 @@ import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.round
 
+data class NoteAndDecibel(
+    val note: String = "",
+    val decibel: Float = 0f
+)
 
 class PitchAnalyzer {
 
     private val notes = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
+    private val notesBuffer = Array(8) { NoteAndDecibel() }
+    private var counter = 0
 
-    private lateinit var onChangePitch: (String, Double) -> Unit
+    private lateinit var onChangePitch: (String) -> Unit
     private var isRecording = false
 
     private var dispatcher: AudioDispatcher? = null
@@ -24,9 +30,8 @@ class PitchAnalyzer {
 
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
-        val soundPressure = e.getdBSPL()
-
-        process(pitchInHz, soundPressure)
+        val decibel = e.getdBSPL().toFloat()
+        process(pitchInHz, decibel)
     }
 
     private fun prepare() {
@@ -36,19 +41,30 @@ class PitchAnalyzer {
         dispatcher?.addAudioProcessor(processor)
     }
 
-    private fun process(pitchInHz: Float, soundPressure: Double) {
+    private fun process(pitchInHz: Float, decibel: Float) {
         val freq = round(12 * (log2(pitchInHz / 440) / log2(2f)) + 69)
         val octave = (floor(freq / 12) - 1).toInt()
         val index = freq % 12
 
         if (!index.isNaN() && pitchInHz > 0) {
             val note = notes[index.toInt()]
+            var noteAndDecibel = NoteAndDecibel(note, decibel)
 
-            this.onChangePitch("$note$octave", soundPressure)
+            if (counter == notesBuffer.size) {
+                var s = ""
+                for (noteAndDecibel in notesBuffer) {
+                    s += noteAndDecibel.note + "*" + noteAndDecibel.decibel + ","
+                }
+                this.onChangePitch(s.substring(0, s.length - 1))
+                counter = 0
+            }
+
+            notesBuffer[counter] = noteAndDecibel
+            counter += 1
         }
     }
 
-    fun addOnChangePitchListener(onChangePitch: (String, Double) -> Unit) {
+    fun addOnChangePitchListener(onChangePitch: (String) -> Unit) {
         this.onChangePitch = onChangePitch
     }
 
