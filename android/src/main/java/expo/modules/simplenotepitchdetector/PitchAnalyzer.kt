@@ -18,7 +18,7 @@ data class NoteAndDecibel(
 class PitchAnalyzer {
 
     private val notes = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
-    private val notesBuffer = Array(8) { NoteAndDecibel() }
+    private val notesBuffer = Array(6) { NoteAndDecibel() }
     private var counter = 0
 
     private lateinit var onChangePitch: (String) -> Unit
