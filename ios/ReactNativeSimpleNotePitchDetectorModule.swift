@@ -66,7 +66,7 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
         if (counter == notes.count) {
             var note = getMostFrequentNote(notes: notes)
             if (note != nil) {
-                self.sendEvent("onChangePitch", ["note" :  note])
+                self.sendEvent("onChangeNote", ["note" :  note])
             }
             counter = 0
         }
