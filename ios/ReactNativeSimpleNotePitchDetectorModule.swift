@@ -2,11 +2,32 @@ import ExpoModulesCore
 import Beethoven
 import Pitchy
 
+
+let NOTE_BUFFER_SIZE = 3
+
 public class ReactNativeSimpleNotePitchDetectorModule: Module {
     
-    var bufferSize = 3
-    var notes = Array(repeating: "", count: 3)
+    var notes = Array(repeating: "", count: NOTE_BUFFER_SIZE)
     var counter = 0
+    
+    public func definition() -> ModuleDefinition {
+
+        Name("ReactNativeSimpleNotePitchDetector")
+
+        Events("onChangeNote")
+
+        Function("start") {
+            pitchEngine.start()
+        }
+
+        Function("stop") {
+            pitchEngine.stop()
+        }
+        
+        Function("isRecording") {
+            return pitchEngine.active
+        }
+    }
     
     lazy var pitchEngine: PitchEngine = { [weak self] in
         let config = Config(estimationStrategy: .yin)
@@ -15,13 +36,11 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
         return pitchEngine
     }()
     
-    func mostFrequent(array: [String]) -> String? {
+    func getMostFrequentNote(notes: [String]) -> String? {
         var counts = [String: Int]()
 
-        // Count the values with using forEach
-        array.forEach { counts[$0] = (counts[$0] ?? 0) + 1 }
-
-        // Find the most frequent value and its count with max(by:)
+        notes.forEach { counts[$0] = (counts[$0] ?? 0) + 1 }
+        
         if let (value, count) = counts.max(by: {$0.1 < $1.1}) {
             if (count <= 1) {
                 return nil
@@ -30,29 +49,6 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
         }
 
         return nil
-    }
-    
-    var isRecording = false
-
-    public func definition() -> ModuleDefinition {
-
-        Name("ReactNativeSimpleNotePitchDetector")
-
-        Events("onChangePitch")
-
-        Function("start") {
-            pitchEngine.start()
-            isRecording = true
-        }
-
-        Function("stop") {
-            pitchEngine.stop()
-            isRecording = false
-        }
-        
-        Function("isRecording") {
-            return isRecording
-        }
     }
 }
 
@@ -67,10 +63,10 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
             return
         }
         
-        if (counter == bufferSize) {
-            var result = mostFrequent(array: notes)
-            if (result != nil) {
-                self.sendEvent("onChangePitch", ["note" :  result, "soundPressure" : ""])
+        if (counter == notes.count) {
+            var note = getMostFrequentNote(notes: notes)
+            if (note != nil) {
+                self.sendEvent("onChangePitch", ["note" :  note])
             }
             counter = 0
         }
@@ -82,8 +78,6 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
         } catch {
             
         }
-
-//        self.sendEvent("onChangePitch", ["note" :  pitch.note.string, "soundPressure" : pitchEngine.signalLevel])
     }
 
     public func pitchEngine(_ pitchEngine: PitchEngine, didReceiveError error: Error) {
