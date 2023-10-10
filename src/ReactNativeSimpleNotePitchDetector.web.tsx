@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { ReactNativeSimpleNotePitchDetectorViewProps } from "./ReactNativeSimpleNotePitchDetector.types";
 
-export default function ExpoSettingsView(
+export default function ReactNativeSimpleNotePitchDetectorView(
   props: ReactNativeSimpleNotePitchDetectorViewProps
 ) {
   return (

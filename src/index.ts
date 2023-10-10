@@ -27,10 +27,10 @@ const emitter = new EventEmitter(
     NativeModulesProxy.ReactNativeSimpleNotePitchDetector
 );
 
-export function onChangePitch(
+export function onChangeNote(
   listener: (event: ChangeEventPayload) => void
 ): Subscription {
-  return emitter.addListener<ChangeEventPayload>("onChangePitch", listener);
+  return emitter.addListener<ChangeEventPayload>("onChangeNote", listener);
 }
 
 export { ReactNativeSimpleNotePitchDetectorViewProps, ChangeEventPayload };
