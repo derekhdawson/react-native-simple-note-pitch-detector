@@ -53,6 +53,8 @@ class PitchAnalyzer {
                 if (mostFrequentNote != null) {
                     onChangeNote(mostFrequentNote)
                 }
+
+                counter = 0
             }
 
             notesBuffer[counter] = noteAndDecibel
