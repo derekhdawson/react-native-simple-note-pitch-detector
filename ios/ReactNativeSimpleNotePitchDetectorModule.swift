@@ -73,7 +73,8 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
         
         do {
             let note = try Note(frequency: pitch.wave.frequency)
-            notes[counter] = note.string
+            let noteStr = note.string
+            notes[counter] = String(noteStr.prefix(noteStr.count - 1))
             counter += 1
         } catch {
             
