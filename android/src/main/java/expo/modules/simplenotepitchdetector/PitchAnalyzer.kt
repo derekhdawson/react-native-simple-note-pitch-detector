@@ -45,20 +45,21 @@ class PitchAnalyzer {
 
         if (!index.isNaN() && pitchInHz > 0) {
             val note = notes[index.toInt()]
-            var noteAndDecibel = NoteAndDecibel(note, decibel)
-
-            if (counter == notesBuffer.size) {
-                var mostFrequentNote = getMostFrequentNote(notesBuffer)
-
-                if (mostFrequentNote != null) {
-                    onChangeNote(mostFrequentNote)
-                }
-
-                counter = 0
-            }
-
-            notesBuffer[counter] = noteAndDecibel
-            counter += 1
+            onChangeNote("$note $decibel")
+//            var noteAndDecibel = NoteAndDecibel(note, decibel)
+//
+//            if (counter == notesBuffer.size) {
+//                var mostFrequentNote = getMostFrequentNote(notesBuffer)
+//
+//                if (mostFrequentNote != null) {
+//                    onChangeNote(mostFrequentNote)
+//                }
+//
+//                counter = 0
+//            }
+//
+//            notesBuffer[counter] = noteAndDecibel
+//            counter += 1
         }
     }
 
