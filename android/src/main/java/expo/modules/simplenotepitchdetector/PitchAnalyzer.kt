@@ -17,7 +17,7 @@ data class NoteAndDecibel(
 class PitchAnalyzer {
 
     private val notes = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
-    private val notesBuffer = Array(8) { NoteAndDecibel() }
+    private val notesBuffer = Array(6) { NoteAndDecibel() }
     private var counter = 0
 
     private lateinit var onChangeNote: (String) -> Unit
@@ -30,7 +30,9 @@ class PitchAnalyzer {
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
         val decibel = e.getdBSPL().toFloat()
-        process(pitchInHz, decibel)
+        if (decibel > -85) {
+            process(pitchInHz, decibel)
+        }
     }
 
     private fun prepare() {
@@ -45,21 +47,20 @@ class PitchAnalyzer {
 
         if (!index.isNaN() && pitchInHz > 0) {
             val note = notes[index.toInt()]
-            onChangeNote("$note $decibel")
-//            var noteAndDecibel = NoteAndDecibel(note, decibel)
-//
-//            if (counter == notesBuffer.size) {
-//                var mostFrequentNote = getMostFrequentNote(notesBuffer)
-//
-//                if (mostFrequentNote != null) {
-//                    onChangeNote(mostFrequentNote)
-//                }
-//
-//                counter = 0
-//            }
-//
-//            notesBuffer[counter] = noteAndDecibel
-//            counter += 1
+            var noteAndDecibel = NoteAndDecibel(note, decibel)
+
+            if (counter == notesBuffer.size) {
+                var mostFrequentNote = getMostFrequentNote(notesBuffer)
+
+                if (mostFrequentNote != null) {
+                    onChangeNote(mostFrequentNote)
+                }
+
+                counter = 0
+            }
+
+            notesBuffer[counter] = noteAndDecibel
+            counter += 1
         }
     }
 

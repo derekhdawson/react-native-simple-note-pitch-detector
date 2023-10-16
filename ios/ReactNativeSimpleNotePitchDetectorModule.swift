@@ -32,7 +32,7 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
     lazy var pitchEngine: PitchEngine = { [weak self] in
         let config = Config(estimationStrategy: .yin)
         let pitchEngine = PitchEngine(config: config, delegate: self)
-        pitchEngine.levelThreshold = -30
+        pitchEngine.levelThreshold = -35
         return pitchEngine
     }()
     
