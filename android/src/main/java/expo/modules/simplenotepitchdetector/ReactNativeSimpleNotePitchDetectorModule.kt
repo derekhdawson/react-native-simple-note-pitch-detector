@@ -3,6 +3,7 @@ package expo.modules.simplenotepitchdetector
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.simplepitchdetector.PitchAnalyzer
+import expo.modules.simplepitchdetector.PitchData
 import androidx.core.os.bundleOf
 
 class ReactNativeSimpleNotePitchDetectorModule : Module() {
@@ -20,10 +21,15 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
     }
 
     Function("start") {
-      pitchAnalyzer.addOnChangeNoteListener { note: String ->
+      pitchAnalyzer.setOnPitchDetectedListener { pitchData: PitchData ->
         this@ReactNativeSimpleNotePitchDetectorModule.sendEvent(
           "onChangeNote",
-          bundleOf("note" to note)
+          bundleOf(
+            "note" to pitchData.note,
+            "octave" to pitchData.octave,
+            "frequency" to pitchData.frequency.toDouble(),
+            "offset" to pitchData.offset.toDouble()
+          )
         )
       }
 
@@ -31,7 +37,11 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
     }
 
     Function("stop") {
-        pitchAnalyzer.stop()
+      pitchAnalyzer.stop()
+    }
+
+    Function("setLevelThreshold") { threshold: Double ->
+      pitchAnalyzer.setLevelThreshold(threshold.toFloat())
     }
   }
 }

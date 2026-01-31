@@ -8,20 +8,24 @@ import be.tarsos.dsp.pitch.PitchProcessor
 import be.tarsos.dsp.pitch.PitchProcessor.PitchEstimationAlgorithm
 import kotlin.math.log2
 import kotlin.math.round
+import kotlin.math.pow
+import kotlin.math.abs
 
-data class NoteAndDecibel(
-    val note: String = "",
-    val decibel: Float = 0f
+data class PitchData(
+    val note: String,
+    val octave: Int,
+    val frequency: Float,
+    val amplitude: Float,
+    val offset: Float
 )
 
 class PitchAnalyzer {
 
     private val notes = arrayOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
-    private val notesBuffer = Array(6) { NoteAndDecibel() }
-    private var counter = 0
 
-    private lateinit var onChangeNote: (String) -> Unit
+    private lateinit var onPitchDetected: (PitchData) -> Unit
     private var isRecording = false
+    private var levelThreshold = -30f
 
     private var dispatcher: AudioDispatcher? = null
     private var processor: AudioProcessor? = null
@@ -30,7 +34,8 @@ class PitchAnalyzer {
     private val handler = PitchDetectionHandler { res, e ->
         val pitchInHz = res.pitch
         val decibel = e.getdBSPL().toFloat()
-        if (decibel > -85) {
+        // Only process if above the level threshold
+        if (decibel > levelThreshold) {
             process(pitchInHz, decibel)
         }
     }
@@ -43,29 +48,42 @@ class PitchAnalyzer {
     }
 
     private fun process(pitchInHz: Float, decibel: Float) {
-        val index = round(12 * (log2(pitchInHz / 440) / log2(2f)) + 69) % 12
-
-        if (!index.isNaN() && pitchInHz > 0) {
-            val note = notes[index.toInt()]
-            var noteAndDecibel = NoteAndDecibel(note, decibel)
-
-            if (counter == notesBuffer.size) {
-                var mostFrequentNote = getMostFrequentNote(notesBuffer)
-
-                if (mostFrequentNote != null) {
-                    onChangeNote(mostFrequentNote)
-                }
-
-                counter = 0
-            }
-
-            notesBuffer[counter] = noteAndDecibel
-            counter += 1
+        if (pitchInHz <= 0 || pitchInHz.isNaN()) {
+            return
         }
+
+        // Calculate MIDI note number (A4 = 440Hz = MIDI 69)
+        val midiNote = 12 * log2(pitchInHz / 440f) + 69
+        val roundedMidiNote = round(midiNote).toInt()
+
+        // Calculate note index (0-11) and octave
+        val noteIndex = ((roundedMidiNote % 12) + 12) % 12
+        val octave = (roundedMidiNote / 12) - 1
+
+        // Calculate offset from perfect pitch (in cents, then convert to percentage)
+        // 100 cents = 1 semitone, so we express as percentage of a semitone
+        val centsOff = (midiNote - roundedMidiNote) * 100
+        val offsetPercentage = centsOff // Already in a reasonable range (-50 to +50)
+
+        val note = notes[noteIndex]
+
+        val pitchData = PitchData(
+            note = note,
+            octave = octave,
+            frequency = pitchInHz,
+            amplitude = decibel,
+            offset = offsetPercentage
+        )
+
+        onPitchDetected(pitchData)
     }
 
-    fun addOnChangeNoteListener(onChangeNote: (String) -> Unit) {
-        this.onChangeNote = onChangeNote
+    fun setOnPitchDetectedListener(listener: (PitchData) -> Unit) {
+        this.onPitchDetected = listener
+    }
+
+    fun setLevelThreshold(threshold: Float) {
+        this.levelThreshold = threshold
     }
 
     fun start() {
@@ -74,6 +92,7 @@ class PitchAnalyzer {
         runner?.start()
         isRecording = true
     }
+
     fun stop() {
         dispatcher?.stop()
         runner?.interrupt()
@@ -82,32 +101,5 @@ class PitchAnalyzer {
 
     fun isRecording(): Boolean {
         return isRecording
-    }
-
-    private fun getMostFrequentNote(notes: Array<NoteAndDecibel>) : String? {
-        val noteToDecibel = mutableMapOf<String, Float>();
-        notes.forEach {
-            if (!noteToDecibel.containsKey(it.note)) {
-                noteToDecibel[it.note] = 0f
-            }
-
-            noteToDecibel[it.note] = noteToDecibel[it.note]!! + it.decibel
-        }
-
-        var mostFrequentNote = ""
-        var maxDecibel = 0f
-
-        noteToDecibel.forEach {
-            if (mostFrequentNote == "" || it.value < maxDecibel) {
-                mostFrequentNote = it.key
-                maxDecibel = it.value
-            }
-        }
-
-        if (mostFrequentNote == "") {
-            return null
-        }
-
-        return mostFrequentNote
     }
 }
