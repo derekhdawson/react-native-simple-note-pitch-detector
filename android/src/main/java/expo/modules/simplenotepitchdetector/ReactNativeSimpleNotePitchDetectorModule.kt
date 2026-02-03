@@ -43,5 +43,29 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
     Function("setLevelThreshold") { threshold: Double ->
       pitchAnalyzer.setLevelThreshold(threshold.toFloat())
     }
+
+    // Allow JS to configure the buffer size
+    // Must be called before start() to take effect
+    // Common values: 1024 (better for high frequencies), 2048 (balanced), 4096 (better for low frequencies)
+    Function("setBufferSize") { size: Int ->
+      pitchAnalyzer.setBufferSize(size)
+    }
+
+    // Get current buffer size
+    Function("getBufferSize") {
+      pitchAnalyzer.getBufferSize()
+    }
+
+    // Allow JS to configure the estimation algorithm
+    // Android options: "yin", "fft_yin", "mpm", "fft_pitch", "dynamic_wavelet", "amdf"
+    // Must be called before start() to take effect
+    Function("setAlgorithm") { algorithm: String ->
+      pitchAnalyzer.setAlgorithm(algorithm)
+    }
+
+    // Get current algorithm name
+    Function("getAlgorithm") {
+      pitchAnalyzer.getAlgorithm()
+    }
   }
 }

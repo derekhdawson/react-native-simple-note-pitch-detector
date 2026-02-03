@@ -26,6 +26,13 @@ class PitchAnalyzer {
     private lateinit var onPitchDetected: (PitchData) -> Unit
     private var isRecording = false
     private var levelThreshold = -30f
+    // Configurable buffer size - can be changed from JS
+    // Larger buffer = better low frequency detection, more latency
+    // Smaller buffer = better high frequency detection, less latency
+    private var bufferSize = 2048
+    // Configurable algorithm - can be changed from JS
+    private var algorithm = PitchEstimationAlgorithm.FFT_YIN
+    private var algorithmName = "fft_yin"
 
     private var dispatcher: AudioDispatcher? = null
     private var processor: AudioProcessor? = null
@@ -42,8 +49,8 @@ class PitchAnalyzer {
 
     private fun prepare() {
         processor =
-            PitchProcessor(PitchEstimationAlgorithm.FFT_YIN, 22050f, 1024, handler)
-        dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(22050, 1024, 0)
+            PitchProcessor(algorithm, 22050f, bufferSize, handler)
+        dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(22050, bufferSize, 0)
         dispatcher?.addAudioProcessor(processor)
     }
 
@@ -84,6 +91,31 @@ class PitchAnalyzer {
 
     fun setLevelThreshold(threshold: Float) {
         this.levelThreshold = threshold
+    }
+
+    fun setBufferSize(size: Int) {
+        this.bufferSize = size
+    }
+
+    fun getBufferSize(): Int {
+        return this.bufferSize
+    }
+
+    fun setAlgorithm(name: String) {
+        this.algorithmName = name.lowercase()
+        this.algorithm = when (this.algorithmName) {
+            "yin" -> PitchEstimationAlgorithm.YIN
+            "fft_yin" -> PitchEstimationAlgorithm.FFT_YIN
+            "mpm" -> PitchEstimationAlgorithm.MPM
+            "fft_pitch" -> PitchEstimationAlgorithm.FFT_PITCH
+            "dynamic_wavelet" -> PitchEstimationAlgorithm.DYNAMIC_WAVELET
+            "amdf" -> PitchEstimationAlgorithm.AMDF
+            else -> PitchEstimationAlgorithm.FFT_YIN // Default
+        }
+    }
+
+    fun getAlgorithm(): String {
+        return this.algorithmName
     }
 
     fun start() {
