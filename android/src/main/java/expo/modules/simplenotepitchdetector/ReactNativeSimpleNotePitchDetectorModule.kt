@@ -10,11 +10,21 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
 
   private val pitchAnalyzer = PitchAnalyzer()
 
+  private fun sendStatus(level: String, message: String) {
+    this.sendEvent(
+      "onStatus",
+      bundleOf(
+        "level" to level,
+        "message" to message
+      )
+    )
+  }
+
   override fun definition() = ModuleDefinition {
 
     Name("ReactNativeSimpleNotePitchDetector")
 
-    Events("onChangeNote")
+    Events("onChangeNote", "onStatus")
 
     Function("isRecording") {
       pitchAnalyzer.isRecording()
@@ -31,6 +41,10 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
             "offset" to pitchData.offset.toDouble()
           )
         )
+      }
+
+      pitchAnalyzer.setOnStatusListener { level: String, message: String ->
+        this@ReactNativeSimpleNotePitchDetectorModule.sendStatus(level, message)
       }
 
       pitchAnalyzer.start()

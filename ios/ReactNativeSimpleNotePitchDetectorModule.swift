@@ -12,14 +12,23 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
     private var estimationStrategy: EstimationStrategy = .yin
     private var _pitchEngine: PitchEngine?
 
+    private func sendStatus(_ level: String, _ message: String) {
+        self.sendEvent("onStatus", [
+            "level": level,
+            "message": message
+        ])
+    }
+
     public func definition() -> ModuleDefinition {
 
         Name("ReactNativeSimpleNotePitchDetector")
 
-        Events("onChangeNote")
+        Events("onChangeNote", "onStatus")
 
         Function("start") {
+            self.sendStatus("debug", "start() called with bufferSize=\(self.bufferSize), algorithm=\(self.estimationStrategy)")
             self.pitchEngine.start()
+            self.sendStatus("debug", "Recording started successfully")
         }
 
         Function("stop") {
@@ -150,7 +159,7 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
     }
 
     public func pitchEngine(_ pitchEngine: PitchEngine, didReceiveError error: Error) {
-        // Optionally send error events to JS
+        self.sendStatus("error", "PitchEngine error: \(error.localizedDescription)")
     }
 
     public func pitchEngineWentBelowLevelThreshold(_ pitchEngine: PitchEngine) {

@@ -111,4 +111,20 @@ export function onChangeNote(
   return emitter.addListener<ChangeEventPayload>("onChangeNote", listener);
 }
 
+export interface StatusEventPayload {
+  level: "debug" | "error" | "verbose";
+  message: string;
+}
+
+/**
+ * Listen for status/debug messages from the native module.
+ * Useful for debugging audio initialization issues.
+ * @param listener - Callback that receives status events with level and message
+ */
+export function onStatus(
+  listener: (event: StatusEventPayload) => void
+): Subscription {
+  return emitter.addListener<StatusEventPayload>("onStatus", listener);
+}
+
 export { ReactNativeSimpleNotePitchDetectorViewProps, ChangeEventPayload };
