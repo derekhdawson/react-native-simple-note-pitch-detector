@@ -35,8 +35,8 @@ class PitchAnalyzer {
     // Smaller buffer = better high frequency detection, less latency
     private var bufferSize = 2048
     // Configurable algorithm - can be changed from JS
-    private var algorithm = PitchEstimationAlgorithm.FFT_YIN
-    private var algorithmName = "fft_yin"
+    private var algorithm = PitchEstimationAlgorithm.MPM
+    private var algorithmName = "mpm"
 
     private var dispatcher: AudioDispatcher? = null
     private var processor: AudioProcessor? = null

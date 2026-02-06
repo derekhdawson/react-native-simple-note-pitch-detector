@@ -36,6 +36,12 @@ export default function App() {
 
       startTime.current = Date.now();
       setStatus("Starting pitch detection...");
+      // Very low threshold to catch everything
+      ReactNativeSimpleNotePitchDetector.setLevelThreshold(-100);
+      // Larger buffer for low frequency detection
+      ReactNativeSimpleNotePitchDetector.setBufferSize(4096);
+      // Try MPM algorithm (often better for musical instruments)
+      ReactNativeSimpleNotePitchDetector.setAlgorithm("mpm");
       ReactNativeSimpleNotePitchDetector.start();
 
       noteSubscription = ReactNativeSimpleNotePitchDetector.onChangeNote((event) => {
