@@ -8,7 +8,3 @@ export type ChangeEventPayload = {
   /** Offset from perfect pitch as percentage (-50 to +50, negative = flat, positive = sharp) */
   offset: number;
 };
-
-export type ReactNativeSimpleNotePitchDetectorViewProps = {
-  name: string;
-};

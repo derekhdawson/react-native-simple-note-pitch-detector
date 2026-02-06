@@ -1,14 +1,9 @@
 import {
-  NativeModulesProxy,
-  EventEmitter,
-  Subscription,
+  EventSubscription,
 } from "expo-modules-core";
 
 import ReactNativeSimpleNotePitchDetectorModule from "./ReactNativeSimpleNotePitchDetectorModule";
-import {
-  ChangeEventPayload,
-  ReactNativeSimpleNotePitchDetectorViewProps,
-} from "./ReactNativeSimpleNotePitchDetector.types";
+import { ChangeEventPayload } from "./ReactNativeSimpleNotePitchDetector.types";
 
 export function start() {
   return ReactNativeSimpleNotePitchDetectorModule.start();
@@ -100,15 +95,10 @@ export function getAlgorithm(): string {
   return ReactNativeSimpleNotePitchDetectorModule.getAlgorithm();
 }
 
-const emitter = new EventEmitter(
-  ReactNativeSimpleNotePitchDetectorModule ??
-    NativeModulesProxy.ReactNativeSimpleNotePitchDetector
-);
-
 export function onChangeNote(
   listener: (event: ChangeEventPayload) => void
-): Subscription {
-  return emitter.addListener<ChangeEventPayload>("onChangeNote", listener);
+): EventSubscription {
+  return ReactNativeSimpleNotePitchDetectorModule.addListener("onChangeNote", listener);
 }
 
 export interface StatusEventPayload {
@@ -123,8 +113,8 @@ export interface StatusEventPayload {
  */
 export function onStatus(
   listener: (event: StatusEventPayload) => void
-): Subscription {
-  return emitter.addListener<StatusEventPayload>("onStatus", listener);
+): EventSubscription {
+  return ReactNativeSimpleNotePitchDetectorModule.addListener("onStatus", listener);
 }
 
-export { ReactNativeSimpleNotePitchDetectorViewProps, ChangeEventPayload };
+export { ChangeEventPayload };
