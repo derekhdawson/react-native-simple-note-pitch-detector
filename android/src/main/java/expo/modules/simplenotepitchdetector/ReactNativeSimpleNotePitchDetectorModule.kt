@@ -58,6 +58,14 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
       pitchAnalyzer.setLevelThreshold(threshold.toFloat())
     }
 
+    Function("setSampleRate") { rate: Int ->
+      pitchAnalyzer.setSampleRate(rate)
+    }
+
+    Function("getSampleRate") {
+      pitchAnalyzer.getSampleRate()
+    }
+
     // Allow JS to configure the buffer size
     // Must be called before start() to take effect
     // Common values: 1024 (better for high frequencies), 2048 (balanced), 4096 (better for low frequencies)
