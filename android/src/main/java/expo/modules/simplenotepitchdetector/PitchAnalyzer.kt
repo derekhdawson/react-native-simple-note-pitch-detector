@@ -5,6 +5,10 @@ import be.tarsos.dsp.AudioDispatcher
 import be.tarsos.dsp.AudioEvent
 import be.tarsos.dsp.AudioProcessor
 import be.tarsos.dsp.io.android.AudioDispatcherFactory
+import be.tarsos.dsp.pitch.PitchDetectionHandler
+import be.tarsos.dsp.pitch.PitchDetectionResult
+import be.tarsos.dsp.pitch.PitchProcessor
+import be.tarsos.dsp.pitch.PitchProcessor.PitchEstimationAlgorithm
 import be.tarsos.dsp.util.fft.FFT
 import kotlin.math.log2
 import kotlin.math.round
@@ -23,10 +27,12 @@ data class PitchData(
 )
 
 /**
- * Pure HPS pitch detector for the full piano range (A0-C8, 27.5-4186Hz).
- * HPS with h=2,3,4,5 finds the fundamental by multiplying harmonic magnitudes.
- * Works for both missing fundamentals (low notes) and present fundamentals (high notes).
- * No MPM, no hybrid — single algorithm, single processor.
+ * Dual-dispatcher pitch detector:
+ * - HPS (Harmonic Product Spectrum, h=2,3,4,5) on its own AudioDispatcher for low notes (<200Hz)
+ * - MPM (McLeod Pitch Method) on a separate AudioDispatcher for mid/high notes (>=200Hz)
+ *
+ * Two completely separate microphone streams to avoid any shared state or buffer corruption.
+ * Previous experiments proved that ANY combination of HPS+MPM in the same dispatcher degrades HPS.
  */
 class PitchAnalyzer {
 
@@ -37,12 +43,18 @@ class PitchAnalyzer {
     private var isRecording = false
     private var levelThreshold = -30f
     private var sampleRate = 44100
-    private var bufferSize = 2048
+    private var bufferSize = 8192
     private var algorithmName = "hps"
 
-    private var dispatcher: AudioDispatcher? = null
-    private var runner: Thread? = null
+    // HPS dispatcher (low notes)
+    private var hpsDispatcher: AudioDispatcher? = null
+    private var hpsThread: Thread? = null
 
+    // MPM dispatcher (mid/high notes)
+    private var mpmDispatcher: AudioDispatcher? = null
+    private var mpmThread: Thread? = null
+
+    // HPS pre-allocated buffers
     private var fftSize = 0
     private var freqResolution = 0f
     private var hpsFft: FFT? = null
@@ -51,9 +63,14 @@ class PitchAnalyzer {
     private var hpsProduct: FloatArray? = null
     private var hannWindow: FloatArray? = null
 
-    // Full piano range: A0 (27.5Hz) to C8 (4186Hz)
-    private val searchMinHz = 26f
-    private val searchMaxHz = 4200f
+    // HPS searches low range only: A0 (27.5Hz) to ~G3 (196Hz)
+    private val hpsMinHz = 26f
+    private val hpsMaxHz = 200f
+
+    // MPM crossover: only emit MPM results >= this frequency
+    private val mpmMinHz = 200f
+    // MPM max: reject garbage above piano range (C8 = 4186Hz)
+    private val mpmMaxHz = 4200f
 
     private val hpsProcessor = object : AudioProcessor {
         override fun process(audioEvent: AudioEvent): Boolean {
@@ -101,9 +118,9 @@ class PitchAnalyzer {
             hps[i] = mags[2 * i] * mags[3 * i] * mags[4 * i] * mags[5 * i]
         }
 
-        // Search for peak in full piano range
-        val minBin = (searchMinHz / freqResolution).toInt().coerceAtLeast(1)
-        val maxBin = (searchMaxHz / freqResolution).toInt().coerceAtMost(hpsSize - 1)
+        // Search for peak in low range only
+        val minBin = (hpsMinHz / freqResolution).toInt().coerceAtLeast(1)
+        val maxBin = (hpsMaxHz / freqResolution).toInt().coerceAtMost(hpsSize - 1)
 
         var peakBin = minBin
         var peakVal = hps[minBin]
@@ -111,15 +128,14 @@ class PitchAnalyzer {
             if (hps[i] > peakVal) { peakBin = i; peakVal = hps[i] }
         }
 
-        // SNR check: compare peak to local noise floor
-        // Use ±200 bins (~270Hz) for wider context, or fall back to search bounds
+        // SNR check
         val snrStart = (peakBin - 200).coerceAtLeast(minBin)
         val snrEnd = (peakBin + 200).coerceAtMost(maxBin)
         var sum = 0.0
         for (i in snrStart..snrEnd) { sum += hps[i].toDouble() }
         val mean = sum / (snrEnd - snrStart + 1)
         val snr = if (mean > 0.0) peakVal.toDouble() / mean else 0.0
-        if (snr < 10.0) return -1f
+        if (snr < 12.0) return -1f
 
         return interpolatePeak(hps, peakBin, minBin, maxBin) * freqResolution
     }
@@ -140,33 +156,64 @@ class PitchAnalyzer {
         }
     }
 
-    private fun prepare() {
-        try {
-            val overlap = (bufferSize * 3) / 4
-            logStatus("debug", "prepare() sampleRate=$sampleRate, bufferSize=$bufferSize, overlap=$overlap, algorithm=PURE_HPS_FULL_RANGE")
+    private fun prepareHPS() {
+        val overlap = (bufferSize * 3) / 4
+        logStatus("debug", "prepareHPS() sampleRate=$sampleRate, bufferSize=$bufferSize, overlap=$overlap")
 
-            // 4x zero-padding for frequency resolution
-            fftSize = bufferSize * 4
-            freqResolution = sampleRate.toFloat() / fftSize
-            hpsFft = FFT(fftSize)
-            fftBuffer = FloatArray(fftSize)
-            magnitudes = FloatArray(fftSize / 2)
-            hpsProduct = FloatArray(fftSize / (2 * 5))
-            hannWindow = FloatArray(bufferSize) { i ->
-                (0.5 * (1.0 - cos(2.0 * PI * i / (bufferSize - 1)))).toFloat()
-            }
-
-            val maxHpsHz = (fftSize / (2 * 5)) * freqResolution
-            logStatus("debug", "HPS: fftSize=$fftSize, freqRes=${freqResolution}Hz/bin, search=${searchMinHz}-${searchMaxHz}Hz, maxHpsHz=$maxHpsHz")
-
-            dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(sampleRate, bufferSize, overlap)
-            dispatcher?.addAudioProcessor(hpsProcessor)
-
-            logStatus("debug", "Pure HPS full-range processor attached")
-        } catch (e: Exception) {
-            logStatus("error", "Error in prepare(): ${e.message}")
-            throw e
+        // 4x zero-padding for frequency resolution
+        fftSize = bufferSize * 4
+        freqResolution = sampleRate.toFloat() / fftSize
+        hpsFft = FFT(fftSize)
+        fftBuffer = FloatArray(fftSize)
+        magnitudes = FloatArray(fftSize / 2)
+        hpsProduct = FloatArray(fftSize / (2 * 5))
+        hannWindow = FloatArray(bufferSize) { i ->
+            (0.5 * (1.0 - cos(2.0 * PI * i / (bufferSize - 1)))).toFloat()
         }
+
+        val maxHpsHz = (fftSize / (2 * 5)) * freqResolution
+        logStatus("debug", "HPS: fftSize=$fftSize, freqRes=${freqResolution}Hz/bin, search=${hpsMinHz}-${hpsMaxHz}Hz, maxHpsHz=$maxHpsHz")
+
+        hpsDispatcher = AudioDispatcherFactory.fromDefaultMicrophone(sampleRate, bufferSize, overlap)
+        hpsDispatcher?.addAudioProcessor(hpsProcessor)
+
+        logStatus("debug", "HPS dispatcher prepared (low notes <${hpsMaxHz}Hz)")
+    }
+
+    private fun prepareMPM() {
+        val mpmBufferSize = 2048
+        val mpmOverlap = (mpmBufferSize * 3) / 4
+        logStatus("debug", "prepareMPM() sampleRate=$sampleRate, bufferSize=$mpmBufferSize, overlap=$mpmOverlap")
+
+        val pitchHandler = PitchDetectionHandler { result: PitchDetectionResult, event: AudioEvent ->
+            val pitch = result.pitch
+            if (pitch > 0 && pitch >= mpmMinHz && pitch <= mpmMaxHz && result.isPitched) {
+                val dB = event.getdBSPL().toFloat()
+                emitPitch(pitch, dB)
+            }
+        }
+
+        // Use YIN instead of MPM — McLeodPitchMethod.peakPicking throws AssertionError
+        // when two AudioRecord instances compete for the microphone
+        val yinPitchProcessor = PitchProcessor(PitchEstimationAlgorithm.YIN, sampleRate.toFloat(), mpmBufferSize, pitchHandler)
+        val safeYinProcessor = object : AudioProcessor {
+            override fun process(audioEvent: AudioEvent): Boolean {
+                try {
+                    return yinPitchProcessor.process(audioEvent)
+                } catch (e: Exception) {
+                    Log.w(TAG, "YIN error (ignored): ${e.message}")
+                    return true
+                }
+            }
+            override fun processingFinished() {
+                yinPitchProcessor.processingFinished()
+            }
+        }
+
+        mpmDispatcher = AudioDispatcherFactory.fromDefaultMicrophone(sampleRate, mpmBufferSize, mpmOverlap)
+        mpmDispatcher?.addAudioProcessor(safeYinProcessor)
+
+        logStatus("debug", "YIN dispatcher prepared (mid/high notes ${mpmMinHz}-${mpmMaxHz}Hz)")
     }
 
     private fun emitPitch(pitchInHz: Float, decibel: Float) {
@@ -177,6 +224,10 @@ class PitchAnalyzer {
         val noteIndex = ((roundedMidiNote % 12) + 12) % 12
         val octave = (roundedMidiNote / 12) - 1
         val centsOff = (midiNote - roundedMidiNote) * 100
+
+        // Pre-filter: JS discards offset > 25% anyway, so skip detections > 40%
+        // to reduce noise in the JS majority voting window
+        if (kotlin.math.abs(centsOff) > 40f) return
 
         onPitchDetected(PitchData(
             note = notes[noteIndex],
@@ -229,22 +280,41 @@ class PitchAnalyzer {
 
     fun start() {
         try {
-            logStatus("debug", "start() called")
-            prepare()
-            runner = Thread(dispatcher)
-            logStatus("debug", "Thread created, starting...")
-            runner?.start()
+            logStatus("debug", "start() called — dual dispatcher mode (HPS + MPM)")
+
+            // Start HPS dispatcher first
+            prepareHPS()
+            hpsThread = Thread(hpsDispatcher)
+            hpsThread?.name = "HPS-Thread"
+            hpsThread?.start()
+            logStatus("debug", "HPS thread started")
+
+            // Start MPM dispatcher second
+            prepareMPM()
+            mpmThread = Thread(mpmDispatcher)
+            mpmThread?.name = "MPM-Thread"
+            mpmThread?.start()
+            logStatus("debug", "MPM thread started")
+
             isRecording = true
-            logStatus("debug", "Recording started successfully")
+            logStatus("debug", "Dual dispatcher recording started successfully")
         } catch (e: Exception) {
             logStatus("error", "Error in start(): ${e.message}")
+            // Clean up whatever was started
+            stop()
             isRecording = false
         }
     }
 
     fun stop() {
-        dispatcher?.stop()
-        runner?.interrupt()
+        hpsDispatcher?.stop()
+        mpmDispatcher?.stop()
+        hpsThread?.interrupt()
+        mpmThread?.interrupt()
+        hpsDispatcher = null
+        mpmDispatcher = null
+        hpsThread = null
+        mpmThread = null
         isRecording = false
     }
 
