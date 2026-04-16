@@ -7,4 +7,6 @@ export type ChangeEventPayload = {
   frequency: number;
   /** Offset from perfect pitch as percentage (-50 to +50, negative = flat, positive = sharp) */
   offset: number;
+  /** Signal amplitude in dB SPL (approximate) */
+  amplitude: number;
 };

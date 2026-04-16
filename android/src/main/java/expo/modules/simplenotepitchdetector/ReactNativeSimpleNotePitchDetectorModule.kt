@@ -38,7 +38,8 @@ class ReactNativeSimpleNotePitchDetectorModule : Module() {
             "note" to pitchData.note,
             "octave" to pitchData.octave,
             "frequency" to pitchData.frequency.toDouble(),
-            "offset" to pitchData.offset.toDouble()
+            "offset" to pitchData.offset.toDouble(),
+            "amplitude" to pitchData.amplitude.toDouble()
           )
         )
       }
