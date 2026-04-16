@@ -63,6 +63,14 @@ class PitchAnalyzer {
     private var hpsProduct: FloatArray? = null
     private var hannWindow: FloatArray? = null
 
+    // Adaptive noise gate: tracks background noise floor per-dispatcher
+    // A note must be this many dB above the noise floor to be emitted
+    private val noiseGateMarginDb = 10f
+    // Exponential moving average decay for noise floor (0.01 = slow adaptation)
+    private val noiseFloorAlpha = 0.01f
+    @Volatile private var hpsNoiseFloor = -60f
+    @Volatile private var yinNoiseFloor = -60f
+
     // HPS searches low range only: A0 (27.5Hz) to ~G3 (196Hz)
     private val hpsMinHz = 26f
     private val hpsMaxHz = 200f
@@ -72,12 +80,26 @@ class PitchAnalyzer {
     // MPM max: reject garbage above piano range (C8 = 4186Hz)
     private val mpmMaxHz = 4200f
 
+    private fun updateNoiseFloor(currentFloor: Float, dB: Float): Float {
+        // Only update noise floor when signal is quiet (close to current floor)
+        // This prevents played notes from raising the floor
+        return if (dB < currentFloor + noiseGateMarginDb) {
+            currentFloor + noiseFloorAlpha * (dB - currentFloor)
+        } else {
+            currentFloor
+        }
+    }
+
     private val hpsProcessor = object : AudioProcessor {
         override fun process(audioEvent: AudioEvent): Boolean {
             val buffer = audioEvent.floatBuffer
             val dB = audioEvent.getdBSPL().toFloat()
 
-            if (dB > levelThreshold) {
+            // Update noise floor estimate
+            hpsNoiseFloor = updateNoiseFloor(hpsNoiseFloor, dB)
+
+            // Adaptive gate: only process if dB is above noise floor + margin
+            if (dB > hpsNoiseFloor + noiseGateMarginDb) {
                 try {
                     val pitch = detectPitchHPS(buffer)
                     if (pitch > 0f) {
@@ -187,8 +209,13 @@ class PitchAnalyzer {
 
         val pitchHandler = PitchDetectionHandler { result: PitchDetectionResult, event: AudioEvent ->
             val pitch = result.pitch
-            if (pitch > 0 && pitch >= mpmMinHz && pitch <= mpmMaxHz && result.isPitched) {
-                val dB = event.getdBSPL().toFloat()
+            val dB = event.getdBSPL().toFloat()
+
+            // Update YIN noise floor
+            yinNoiseFloor = updateNoiseFloor(yinNoiseFloor, dB)
+
+            if (pitch > 0 && pitch >= mpmMinHz && pitch <= mpmMaxHz && result.isPitched
+                && dB > yinNoiseFloor + noiseGateMarginDb) {
                 emitPitch(pitch, dB)
             }
         }
@@ -224,10 +251,6 @@ class PitchAnalyzer {
         val noteIndex = ((roundedMidiNote % 12) + 12) % 12
         val octave = (roundedMidiNote / 12) - 1
         val centsOff = (midiNote - roundedMidiNote) * 100
-
-        // Pre-filter: JS discards offset > 25% anyway, so skip detections > 40%
-        // to reduce noise in the JS majority voting window
-        if (kotlin.math.abs(centsOff) > 40f) return
 
         onPitchDetected(PitchData(
             note = notes[noteIndex],
