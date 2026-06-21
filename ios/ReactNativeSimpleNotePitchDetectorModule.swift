@@ -25,11 +25,13 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
         do {
             try session.setCategory(
                 .playAndRecord,
-                mode: .measurement,
                 options: [.defaultToSpeaker, .allowBluetooth]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            self.sendStatus("debug", "AVAudioSession configured: category=playAndRecord, mode=measurement")
+            self.sendStatus(
+                "debug",
+                "AVAudioSession configured: category=playAndRecord, sampleRate=\(session.sampleRate), inputChannels=\(session.inputNumberOfChannels), inputAvailable=\(session.isInputAvailable)"
+            )
         } catch {
             self.sendStatus("error", "Failed to configure AVAudioSession: \(error.localizedDescription)")
         }
@@ -179,7 +181,12 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
         self.sendStatus("error", "PitchEngine error: \(error.localizedDescription)")
     }
 
+    private var belowThresholdLogged = false
     public func pitchEngineWentBelowLevelThreshold(_ pitchEngine: PitchEngine) {
-        // Audio dropped below threshold - could notify JS if needed
+        // Log once per session to avoid spamming
+        if !belowThresholdLogged {
+            self.sendStatus("debug", "Audio level below threshold (audio is reaching Beethoven but too quiet)")
+            belowThresholdLogged = true
+        }
     }
 }
