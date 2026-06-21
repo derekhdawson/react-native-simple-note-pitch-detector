@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Beethoven
 import Pitchy
+import AVFoundation
 
 
 public class ReactNativeSimpleNotePitchDetectorModule: Module {
@@ -19,6 +20,21 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
         ])
     }
 
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [.defaultToSpeaker, .allowBluetooth]
+            )
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            self.sendStatus("debug", "AVAudioSession configured: category=playAndRecord, mode=measurement")
+        } catch {
+            self.sendStatus("error", "Failed to configure AVAudioSession: \(error.localizedDescription)")
+        }
+    }
+
     public func definition() -> ModuleDefinition {
 
         Name("ReactNativeSimpleNotePitchDetector")
@@ -27,6 +43,7 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
 
         Function("start") {
             self.sendStatus("debug", "start() called with bufferSize=\(self.bufferSize), algorithm=\(self.estimationStrategy)")
+            self.configureAudioSession()
             self.pitchEngine.start()
             self.sendStatus("debug", "Recording started successfully")
         }
