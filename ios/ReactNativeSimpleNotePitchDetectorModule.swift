@@ -4,6 +4,71 @@ import Pitchy
 import AVFoundation
 
 
+// Beethoven's built-in InputSignalTracker runs a second AVCaptureSession
+// just to read audio levels. On iOS 26 that returns -inf, so the tap's
+// `averageLevel > threshold` check is always false and pitch detection
+// never sees a single buffer. This replacement uses ONE AVAudioEngine and
+// computes the level directly from each buffer.
+final class BufferLevelSignalTracker: NSObject, SignalTracker {
+    weak var delegate: SignalTrackerDelegate?
+    var levelThreshold: Float?
+
+    private let bufferSize: AVAudioFrameCount
+    private var audioEngine: AVAudioEngine?
+    private var lastLevel: Float = -160.0
+    private let bus = 0
+
+    var mode: SignalTrackerMode { .record }
+    var averageLevel: Float? { lastLevel }
+    var peakLevel: Float? { lastLevel }
+
+    init(bufferSize: AVAudioFrameCount = 8192, delegate: SignalTrackerDelegate? = nil) {
+        self.bufferSize = bufferSize
+        self.delegate = delegate
+    }
+
+    func start() throws {
+        let engine = AVAudioEngine()
+        audioEngine = engine
+
+        let inputNode = engine.inputNode
+        let format = inputNode.outputFormat(forBus: bus)
+
+        inputNode.installTap(onBus: bus, bufferSize: bufferSize, format: format) { [weak self] buffer, time in
+            guard let self = self else { return }
+            guard let channelData = buffer.floatChannelData?[0] else { return }
+
+            let frameLength = Int(buffer.frameLength)
+            var sumSquares: Float = 0
+            for i in 0..<frameLength {
+                let sample = channelData[i]
+                sumSquares += sample * sample
+            }
+            let rms = sqrt(sumSquares / Float(frameLength))
+            let level = 20 * log10f(max(rms, 1e-10))
+            self.lastLevel = level
+
+            let threshold = self.levelThreshold ?? -160.0
+            DispatchQueue.main.async {
+                if level > threshold {
+                    self.delegate?.signalTracker(self, didReceiveBuffer: buffer, atTime: time)
+                } else {
+                    self.delegate?.signalTrackerWentBelowLevelThreshold(self)
+                }
+            }
+        }
+
+        try engine.start()
+    }
+
+    func stop() {
+        audioEngine?.inputNode.removeTap(onBus: bus)
+        audioEngine?.stop()
+        audioEngine = nil
+    }
+}
+
+
 public class ReactNativeSimpleNotePitchDetectorModule: Module {
 
     // Configurable buffer size - can be changed from JS
@@ -12,6 +77,7 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
     private var bufferSize: UInt32 = 8192
     private var estimationStrategy: EstimationStrategy = .yin
     private var _pitchEngine: PitchEngine?
+    private var belowThresholdLogged = false
 
     private func sendStatus(_ level: String, _ message: String) {
         self.sendEvent("onStatus", [
@@ -25,7 +91,7 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
         do {
             try session.setCategory(
                 .playAndRecord,
-                options: [.defaultToSpeaker, .allowBluetooth]
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
             )
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             self.sendStatus(
@@ -140,9 +206,10 @@ public class ReactNativeSimpleNotePitchDetectorModule: Module {
             return engine
         }
         let config = Config(bufferSize: bufferSize, estimationStrategy: estimationStrategy)
-        let engine = PitchEngine(config: config, delegate: self)
+        let signalTracker = BufferLevelSignalTracker(bufferSize: bufferSize)
+        let engine = PitchEngine(config: config, signalTracker: signalTracker, delegate: self)
         // Default threshold - can be adjusted from JS via setLevelThreshold()
-        engine.levelThreshold = -30
+        engine.levelThreshold = -60
         _pitchEngine = engine
         return engine
     }
@@ -181,7 +248,6 @@ extension ReactNativeSimpleNotePitchDetectorModule: PitchEngineDelegate {
         self.sendStatus("error", "PitchEngine error: \(error.localizedDescription)")
     }
 
-    private var belowThresholdLogged = false
     public func pitchEngineWentBelowLevelThreshold(_ pitchEngine: PitchEngine) {
         // Log once per session to avoid spamming
         if !belowThresholdLogged {
